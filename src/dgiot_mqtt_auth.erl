@@ -27,54 +27,21 @@
 -define(TABLE, emqx_user).
 %% Auth callbacks
 -export([
-    check/3
-    , description/0
+  check/3
+  , description/0
 ]).
 
 
-check(ClientInfo = #{clientid := _Clientid,
-    password := NPassword}, AuthResult, #{hash_type := HashType}) ->
-    _Username = maps:get(username, ClientInfo, undefined),
-    List = [],
-    case match_password(NPassword, HashType, List) of
-        false ->
-%%           ?LOG(error, "[Mnesia] Auth from mnesia failed: ~p", [ClientInfo]),
-            {stop, AuthResult#{anonymous => false, auth_result => password_error}};
-        _ ->
-            {stop, AuthResult#{anonymous => false, auth_result => success}}
-    end.
+check(#{username := Username, token := Token}, AuthResult, #{hash_type := _HashType})
+  when Username =/= undefined ->
+
+  case dgiot_auth:get_session(Token) of
+    #{<<"username">> := Username} ->
+      {stop, AuthResult#{anonymous => false, auth_result => success}};
+    _ ->
+      {stop, AuthResult#{anonymous => false, auth_result => password_error}}
+  end;
+check(_, AuthResult, _) ->
+  {stop, AuthResult#{anonymous => false, auth_result => password_error}}.
 
 description() -> "Authentication with Mnesia".
-
-
-match_password(Password, HashType, HashList) ->
-    lists:any(
-        fun(Secret) ->
-            case is_salt_hash(Secret, HashType) of
-                true ->
-                    <<Salt:4/binary, Hash/binary>> = Secret,
-                    Hash =:= hash(Password, Salt, HashType);
-                _ ->
-                    Secret =:= hash(Password, HashType)
-            end
-        end, HashList).
-
-hash(undefined, HashType) ->
-    hash(<<>>, HashType);
-hash(Password, HashType) ->
-    emqx_passwd:hash(HashType, Password).
-
-hash(undefined, SaltBin, HashType) ->
-    hash(<<>>, SaltBin, HashType);
-hash(Password, SaltBin, HashType) ->
-    emqx_passwd:hash(HashType, <<SaltBin/binary, Password/binary>>).
-
-is_salt_hash(_, plain) ->
-    true;
-is_salt_hash(Secret, HashType) ->
-    not (byte_size(Secret) == len(HashType)).
-
-len(md5) -> 32;
-len(sha) -> 40;
-len(sha256) -> 64;
-len(sha512) -> 128.
