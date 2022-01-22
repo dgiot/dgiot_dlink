@@ -27,7 +27,7 @@
 check_acl(ClientInfo, PubSub, Topic, _NoMatchAction, _Params) ->
   _Username = maps:get(username, ClientInfo, undefined),
   Acls = [],
-  case match(ClientInfo, PubSub, Topic, Acls) of
+  case do_check(ClientInfo, PubSub, Topic, Acls) of
     allow ->
       ok;
 %%            {stop, allow};
@@ -44,51 +44,71 @@ description() -> "Acl with Mnesia".
 %% Internal functions
 %%-------------------------------------------------------------------
 
-match(_ClientInfo, _PubSub, _Topic, []) ->
-  nomatch;
-match(ClientInfo, PubSub, Topic, [_ | Acls]) ->
-  match(ClientInfo, PubSub, Topic, Acls);
+do_check(_ClientInfo, _PubSub, _Topic, []) ->
+  ok;
+do_check(ClientInfo, PubSub, Topic, [_ | Acls]) ->
+  do_check(ClientInfo, PubSub, Topic, Acls);
 
-match(ClientInfo, PubSub, Topic, [{_, ACLTopic, Action, Access, _} | Acls]) ->
-  case match_actions(PubSub, Action) andalso match_topic(ClientInfo, Topic, ACLTopic) of
-    true -> Access;
-    false -> match(ClientInfo, PubSub, Topic, Acls)
-  end.
-
-match_topic(ClientInfo, Topic, ACLTopic) when is_binary(Topic) ->
-  {Acc, Token} = feed_var(ClientInfo, ACLTopic),
-  MatchResult = emqx_topic:match(Topic, Acc),
-  case Token == undefined of
-    true ->
-      MatchResult;
+%% 用户订阅 "$dg/user/deviceid/#"
+do_check(#{clientid := ClientID, username := Username} = ClientInfo, subscribe, Topic, [{_, <<"$dg/user/", DeviceInfo/binary>>, sub, _Access, _} | Acls])
+  when ClientID =/= undefined ->
+  [DeviceID | _] = binary:split(DeviceInfo, <<"/">>),
+  %% 此时的ClientID为Token
+  case check_device_acl(ClientID, DeviceID, Username) of
+    ok ->
+      do_check(ClientInfo, subscribe, Topic, Acls);
     _ ->
-      Username = maps:get(username, ClientInfo, undefined),
-      Password = maps:get(password, ClientInfo, undefined),
-      case dgiot_auth:get_session(Token) of
-        #{<<"username">> := Username, <<"password">> := Password} ->
-          MatchResult;
-        _ -> false
+      deny
+  end;
+%%"$dg/device/productid/devaddr/#"
+do_check(#{clientid := ClientID} = ClientInfo, subscribe, Topic, [{_, <<"$dg/device/", DeviceInfo/binary>>, sub, _Access, _} | Acls])
+  ->
+  [ProuctID, Devaddr | _] = binary:split(DeviceInfo, <<"/">>, [global]),
+  DeviceID = dgiot_parse:get_deviceid(ProuctID, Devaddr),
+  case ClientID == DeviceID of
+    true ->
+      do_check(ClientInfo, subscribe, Topic, Acls);
+    _ ->
+      deny
+  end;
+
+%%"$dg/thing/deviceid/#"
+%%"$dg/thing/productid/devaddr/#"
+do_check(#{clientid := ClientID, username := Username} = ClientInfo, publish, Topic, [{_, <<"$dg/thing/", DeviceInfo/binary>>, pub, _Access, _} | Acls])
+  when ClientID =/= undefined ->
+  [ID, Devaddr | _] = binary:split(DeviceInfo, <<"/">>, [global]),
+  %% 先判断ClientID为Token
+  case check_device_acl(ClientID, ID, Username) of
+    ok ->
+      do_check(ClientInfo, publish, Topic, Acls);
+    _ ->
+      DeviceID = dgiot_parse:get_deviceid(ID, Devaddr),
+      case ClientID == DeviceID of
+        true ->
+          do_check(ClientInfo, publish, Topic, Acls);
+        _ ->
+          deny
       end
+  end;
+
+do_check(ClientInfo, PubSub, Topic, [_ | Acls]) ->
+  do_check(ClientInfo, PubSub, Topic, Acls).
+
+check_device_acl(Token, DeviceID, UserName) ->
+  {TUsername, Acl} =
+    case dgiot_auth:get_session(Token) of
+      #{<<"username">> := Name, <<"ACL">> := Acl1} -> {Name, Acl1};
+      _ -> {<<"">>, #{}}
+    end,
+  case TUsername == UserName of
+    true ->
+      DeviceAcl = dgiot_device:get_acl(DeviceID),
+      case DeviceAcl == Acl of
+        true ->
+          ok;
+        _ ->
+          deny
+      end;
+    _ ->
+      deny
   end.
-
-match_actions(subscribe, sub) -> true;
-match_actions(publish, pub) -> true;
-match_actions(_, _) -> false.
-
-feed_var(ClientInfo, Pattern) ->
-  feed_var(ClientInfo, emqx_topic:words(Pattern), [], undefined).
-feed_var(_ClientInfo, [], Acc, TokenAcc) ->
-  {emqx_topic:join(lists:reverse(Acc)), TokenAcc};
-feed_var(ClientInfo = #{clientid := undefined}, [<<"%c">> | Words], Acc, TokenAcc) ->
-  feed_var(ClientInfo, Words, [<<"%c">> | Acc], TokenAcc);
-feed_var(ClientInfo = #{clientid := ClientId}, [<<"%c">> | Words], Acc, TokenAcc) ->
-  feed_var(ClientInfo, Words, [ClientId | Acc], TokenAcc);
-feed_var(ClientInfo = #{username := undefined}, [<<"%u">> | Words], Acc, TokenAcc) ->
-  feed_var(ClientInfo, Words, [<<"%u">> | Acc], TokenAcc);
-feed_var(ClientInfo = #{username := Username}, [<<"%u">> | Words], Acc, TokenAcc) ->
-  feed_var(ClientInfo, Words, [Username | Acc], TokenAcc);
-feed_var(ClientInfo = #{password := Token}, [<<"%t">> | Words], Acc, TokenAcc) when TokenAcc == undefined ->
-  feed_var(ClientInfo, Words, Acc, Token);
-
-feed_var(ClientInfo, [W | Words], Acc, TokenAcc) ->
-  feed_var(ClientInfo, Words, [W | Acc], TokenAcc).
