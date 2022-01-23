@@ -31,16 +31,34 @@
   , description/0
 ]).
 
+check(#{username := Username}, AuthResult, _)
+  when Username =/= <<"anonymous">> orelse Username =/= undefined ->
+  {stop, AuthResult#{anonymous => true, auth_result => success}};
 
-check(#{username := Username, token := Token}, AuthResult, #{hash_type := _HashType})
-  when Username =/= undefined ->
-
-  case dgiot_auth:get_session(Token) of
+%% 当 clientid 和 password 为token 且相等的时候为用户登录
+check(#{clientid := ClientID, username := Username, password := Password}, AuthResult, #{hash_type := _HashType})
+  when ClientID == Password ->
+  case dgiot_auth:get_session(ClientID) of
     #{<<"username">> := Username} ->
       {stop, AuthResult#{anonymous => false, auth_result => success}};
     _ ->
       {stop, AuthResult#{anonymous => false, auth_result => password_error}}
   end;
+
+%% ClientID 为deviceID Username 为 ProductID
+check(#{clientid := _ClientID, username := ProductID, password := Password}, AuthResult, #{hash_type := _HashType}) ->
+  case dgiot_product:lookup_prod(ProductID) of
+    {ok, #{<<"deviceSecret">> := DeviceSecret, <<"productSecret">> := ProductSecret}} ->
+      case ProductSecret == Password or DeviceSecret == Password of
+        true ->
+          {stop, AuthResult#{anonymous => false, auth_result => success}};
+        _ ->
+          {stop, AuthResult#{anonymous => false, auth_result => password_error}}
+      end;
+    _ ->
+      {stop, AuthResult#{anonymous => false, auth_result => password_error}}
+  end;
+
 check(_, AuthResult, _) ->
   {stop, AuthResult#{anonymous => false, auth_result => password_error}}.
 
