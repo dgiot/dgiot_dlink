@@ -27,39 +27,44 @@
 -define(TABLE, emqx_user).
 %% Auth callbacks
 -export([
-  check/3
-  , description/0
+    check/3
+    , description/0
 ]).
 
 check(#{username := Username}, AuthResult, _)
-  when Username == <<"anonymous">> orelse Username =/= undefined ->
-  {stop, AuthResult#{anonymous => true, auth_result => success}};
+    when Username == <<"anonymous">> orelse Username =/= undefined ->
+    io:format("~s ~p Username: ~p~n", [?FILE, ?LINE, Username]),
+    {stop, AuthResult#{anonymous => true, auth_result => success}};
 
-%% 当clientid 和 password 为token且相等的时候为用户登录
+%% 当 clientid 和 password 为token 且相等的时候为用户登录
 check(#{clientid := ClientID, username := Username, password := Password}, AuthResult, #{hash_type := _HashType})
-  when ClientID == Password ->
-  case dgiot_auth:get_session(ClientID) of
-    #{<<"username">> := Username} ->
-      {stop, AuthResult#{anonymous => false, auth_result => success}};
-    _ ->
-      {stop, AuthResult#{anonymous => false, auth_result => password_error}}
-  end;
-
-%% ClientID为deviceID , Username为ProductID
-check(#{clientid := DeviceID, username := ProductID, password := Password}, AuthResult, #{hash_type := _HashType}) ->
-  case dgiot_product:lookup_prod(ProductID) of
-    {ok, #{<<"productSecret">> := Password}} ->
-      {stop, AuthResult#{anonymous => false, auth_result => success}};
-    _ ->
-      case dgiot_device:lookup(DeviceID) of
-        {ok, {[_, _, _Acl, _, _, _, Password], _}} ->
-          {stop, AuthResult#{anonymous => false, auth_result => success}};
+    when ClientID == Password ->
+    io:format("~s ~p Username: ~p~n", [?FILE, ?LINE, Username]),
+    case dgiot_auth:get_session(ClientID) of
+        #{<<"username">> := Username} ->
+            {stop, AuthResult#{anonymous => false, auth_result => success}};
         _ ->
-          {stop, AuthResult#{anonymous => false, auth_result => success}}
-      end
-  end;
+            {stop, AuthResult#{anonymous => false, auth_result => password_error}}
+    end;
 
-check(_, AuthResult, _) ->
-  {stop, AuthResult#{anonymous => false, auth_result => password_error}}.
+%% ClientID 为deviceID Username 为 ProductID
+check(#{clientid := DeviceID, username := ProductID, password := Password}, AuthResult, #{hash_type := _HashType}) ->
+    io:format("~s ~p ProductID: ~p~n", [?FILE, ?LINE, ProductID]),
+    case dgiot_product:lookup_prod(ProductID) of
+        {ok, #{<<"productSecret">> := Password}} ->
+            {stop, AuthResult#{anonymous => false, auth_result => success}};
+        _ ->
+            case dgiot_device:lookup(DeviceID) of
+                {ok, {[_, _, _Acl, _, _, _, Password], _}} ->
+                    {stop, AuthResult#{anonymous => false, auth_result => success}};
+                _ ->
+                    {stop, AuthResult#{anonymous => false, auth_result => success}}
+%%                    {stop, AuthResult#{anonymous => false, auth_result => password_error}}
+            end
+    end;
+
+check(#{username := Username}, AuthResult, _) ->
+    io:format("~s ~p Username: ~p~n", [?FILE, ?LINE, Username]),
+    {stop, AuthResult#{anonymous => false, auth_result => password_error}}.
 
 description() -> "Authentication with Mnesia".

@@ -8,7 +8,6 @@
 + 设备侧topic交互采用 {productId}/{deviceAddr}的组合来唯一标识设备, deviceAddr为设备物理地址
 + 用户侧topic交互采用{deviceId}来唯一标识设备，用{userId}来唯一标识用户,deviceId为设备虚拟地址
 
-
 ### 鉴权设计
 + deviceId=md5("Device" + {productId} + {devAddr}).subString(10)
 + %u 表示用Username做ACL规则
@@ -22,7 +21,6 @@
 | Device |{productId}|{deviceSecret}|{deviceId}| 一机一密 | $dg/device/%u/%d/# | $dg/thing/%u/%d/# |
 | Device |{productId}|{productSecret}|{deviceId}| 证书加密 | $dg/device/%u/# | $dg/thing/%u/# |
 | User |{userId}|{Token}|{Token}| Token认证 | $dg/user/%t/# | $dg/thing/%t/# |
-
 
 
 ## topic设计

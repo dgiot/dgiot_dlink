@@ -76,8 +76,6 @@ start(ChannelId, ChannelArgs) ->
 init(?TYPE, ChannelId, #{
     <<"product">> := Products,
     <<"auth">> := Auth}) ->
-%%    load_auth_hook(),
-%%    load_acl_hook(),
 %%    io:format("Products = ~p.~n", [Products]),
     lists:map(fun(X) ->
         case X of
@@ -102,7 +100,8 @@ init(?TYPE, ChannelId, #{
         id = ChannelId,
         auth = Auth
     },
-%%    dgiot_matlab_tcp:start(Port, State)
+    dgiot_rule_handler:sysc_rules(),
+    emqx_rule_engine_api:list_rules(#{}, []),
     {ok, State};
 
 init(?TYPE, _ChannelId, _Args) ->
@@ -138,7 +137,7 @@ handle_message({rule, #{clientid := _DeviceId, username := ProductId, payload :=
             case binary:split(Topic, <<$/>>, [global, trim]) of
 %%                     /ecfd3a227c/6C4B909AF64A/metadata/derived  派生物模型上报
                 [<<>>, ProductId, DtuAddr, <<"metadata">>, <<"derived">>] ->
-                    create_device(ProductId, DtuAddr, <<"MATLAB_", DtuAddr/binary>>, Peerhost),
+                    create_device(ProductId, DtuAddr, <<"MQTT_", DtuAddr/binary>>, Peerhost),
                     case jsx:decode(Payload, [{labels, binary}, return_maps]) of
                         #{<<"timestamp">> := _Timestamp,
                             <<"metadata">> := Metadata,
@@ -271,10 +270,3 @@ create_rules(RuleID, ChannelId, Description, Rawsql, Target_topic) ->
                 _ -> pass
             end
     end.
-
-
-%%load_auth_hook() ->
-%%    emqx:hook('client.authenticate', fun dgiot_mqtt_auth:check/3, [#{hash_type => plain}]).
-%%
-%%load_acl_hook() ->
-%%    emqx:hook('client.check_acl', fun dgiot_mqtt_acl:check_acl/5, [#{}]).
