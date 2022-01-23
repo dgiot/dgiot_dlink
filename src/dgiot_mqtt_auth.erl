@@ -32,7 +32,7 @@
 ]).
 
 check(#{username := Username}, AuthResult, _)
-  when Username =/= <<"anonymous">> orelse Username =/= undefined ->
+  when Username == <<"anonymous">> orelse Username =/= undefined ->
   {stop, AuthResult#{anonymous => true, auth_result => success}};
 
 %% 当clientid 和 password 为token且相等的时候为用户登录
