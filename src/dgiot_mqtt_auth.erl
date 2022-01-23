@@ -45,18 +45,18 @@ check(#{clientid := ClientID, username := Username, password := Password}, AuthR
       {stop, AuthResult#{anonymous => false, auth_result => password_error}}
   end;
 
-%% ClientID为deviceID, Username为ProductID
-check(#{clientid := _ClientID, username := ProductID, password := Password}, AuthResult, #{hash_type := _HashType}) ->
+%% ClientID为deviceID , Username为ProductID
+check(#{clientid := DeviceID, username := ProductID, password := Password}, AuthResult, #{hash_type := _HashType}) ->
   case dgiot_product:lookup_prod(ProductID) of
-    {ok, #{<<"deviceSecret">> := DeviceSecret, <<"productSecret">> := ProductSecret}} ->
-      case ProductSecret == Password or DeviceSecret == Password of
-        true ->
+    {ok, #{<<"productSecret">> := Password}} ->
+      {stop, AuthResult#{anonymous => false, auth_result => success}};
+    _ ->
+      case dgiot_device:lookup(DeviceID) of
+        {ok, {[_, _, _Acl, _, _, _, Password], _}} ->
           {stop, AuthResult#{anonymous => false, auth_result => success}};
         _ ->
-          {stop, AuthResult#{anonymous => false, auth_result => password_error}}
-      end;
-    _ ->
-      {stop, AuthResult#{anonymous => false, auth_result => password_error}}
+          {stop, AuthResult#{anonymous => false, auth_result => success}}
+      end
   end;
 
 check(_, AuthResult, _) ->

@@ -77,7 +77,7 @@ do_check(#{clientid := ClientID} = ClientInfo, subscribe, Topic, [{_, <<"$dg/dev
 do_check(#{clientid := ClientID, username := Username} = ClientInfo, publish, Topic, [{_, <<"$dg/thing/", DeviceInfo/binary>>, pub, _Access, _} | Acls])
   when ClientID =/= undefined ->
   [ID, Devaddr | _] = binary:split(DeviceInfo, <<"/">>, [global]),
-  %% 先判断clientid为 Token
+  %% 先判断clientid为Token
   case check_device_acl(ClientID, ID, Username) of
     ok ->
       do_check(ClientInfo, publish, Topic, Acls);
