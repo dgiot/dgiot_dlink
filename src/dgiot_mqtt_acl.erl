@@ -49,11 +49,11 @@ do_check(_ClientInfo, _PubSub, _Topic, []) ->
 do_check(ClientInfo, PubSub, Topic, [_ | Acls]) ->
   do_check(ClientInfo, PubSub, Topic, Acls);
 
-%% 用户订阅t "$dg/user/deviceid/#"
+%% 用户订阅 "$dg/user/deviceid/#"
 do_check(#{clientid := ClientID, username := Username} = ClientInfo, subscribe, Topic, [{_, <<"$dg/user/", DeviceInfo/binary>>, sub, _Access, _} | Acls])
   when ClientID =/= undefined ->
   [DeviceID | _] = binary:split(DeviceInfo, <<"/">>),
-  %% 此时的ClientID为Token
+  %% 此时的ClientID为 Token
   case check_device_acl(ClientID, DeviceID, Username) of
     ok ->
       do_check(ClientInfo, subscribe, Topic, Acls);
@@ -77,7 +77,7 @@ do_check(#{clientid := ClientID} = ClientInfo, subscribe, Topic, [{_, <<"$dg/dev
 do_check(#{clientid := ClientID, username := Username} = ClientInfo, publish, Topic, [{_, <<"$dg/thing/", DeviceInfo/binary>>, pub, _Access, _} | Acls])
   when ClientID =/= undefined ->
   [ID, Devaddr | _] = binary:split(DeviceInfo, <<"/">>, [global]),
-  %% 先判断clientid为Token
+  %% 先判断clientid为 Token
   case check_device_acl(ClientID, ID, Username) of
     ok ->
       do_check(ClientInfo, publish, Topic, Acls);
