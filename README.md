@@ -54,4 +54,4 @@
 | 事件上报 |$dg/user/{deviceId}/events|平台|用户|
 
 ## payload设计
-待设计
++ 支持grpc多语言编解码
