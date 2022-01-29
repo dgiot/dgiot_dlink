@@ -13,32 +13,51 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 %%--------------------------------------------------------------------
--module(dgiot_mqtt_sup).
 
--behaviour(supervisor).
+%% @doc
+%%
+%% dgiot_mqtt_app:
+%%
+%%
+%%
+%% @end
+-module(dgiot_dlink_app).
+-emqx_plugin(auth).
+-behaviour(application).
 
-%% API
--export([start_link/0]).
+%% Application callbacks
+-export([start/2,
+    prep_stop/1,
+    stop/1]).
 
-%% Supervisor callbacks
--export([init/1]).
-
-%% Helper macro for declaring children of supervisor
--define(CHILD(I, Type, Args), {I, {I, start_link, Args}, permanent, 5000, Type, [I]}).
 
 %% ===================================================================
-%% API functions
+%% Application callbacks
 %% ===================================================================
 
-start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+start(_StartType, _StartArgs) ->
+    {ok, Sup} = dgiot_dlink_sup:start_link(),
+    _ = load_auth_hook(),
+    _ = load_acl_hook(),
+    _ = load_publish_hook(),
+    {ok, Sup}.
 
-%% ===================================================================
-%% Supervisor callbacks
-%% ===================================================================
 
+stop(_State) ->
+    ok.
 
-init([]) ->
-    Children = [],
-    {ok, {{one_for_one, 5, 10}, Children}}.
+prep_stop(State) ->
+    emqx:unhook('client.authenticate', fun dgiot_mqtt_auth:check/3),
+    emqx:unhook('client.check_acl', fun dgiot_mqtt_acl:check_acl/5),
+    State.
+
+load_auth_hook() ->
+    emqx:hook('client.authenticate', fun dgiot_mqtt_auth:check/3, [#{hash_type => plain}]).
+
+load_acl_hook() ->
+    emqx:hook('client.check_acl', fun dgiot_mqtt_acl:check_acl/5, [#{}]).
+
+load_publish_hook() ->
+    emqx:hook('message.publish', fun dgiot_mqtt_message:on_message_publish/2, [#{}]).
+
 

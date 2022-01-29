@@ -20,7 +20,7 @@
 -record(state, {id, client = disconnect}).
 -include_lib("dgiot_bridge/include/dgiot_bridge.hrl").
 -include_lib("dgiot/include/logger.hrl").
--include("dgiot_mqtt.hrl").
+-include("dgiot_dlink.hrl").
 
 %% API
 -dgiot_data("ets").

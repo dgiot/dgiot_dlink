@@ -12,18 +12,16 @@
 ### 鉴权设计
 + deviceId=md5("Device" + {productId} + {devAddr}).subString(10)
 + %u 表示用Username做ACL规则
-+ %c 表示用ClientId做ACL规则
-+ %d 表示用DeviceAddr做ACL规则, Token是dgiot用户登录权限系统的token,与API权限一致
-+ %t 表示用Token做ACL规则, Token是dgiot用户登录权限系统的token,与API权限一致
++ %c 表示用clientId做ACL规则
+ - 用户侧clientId用Token做ACL规则, Token是dgiot用户登录权限系统的token,与API权限一致
+ - 设备侧clientId可用deviceAddr或者deviceId,如果用deviceAddr需要用户自己保证唯一性
 
 | 客户端   | Username  |  Password |  ClientId  | 登录鉴权|  订阅ACL  | 发布ACL|
 | --------  | -------- | ------- | -------- |-------- | ------- | -------- |
-| Device |{productId}|{productSecret}|{deviceId}| 一型一密 | $dg/device/%u/# | $dg/thing/%u/# |
-| Device |{productId}|{deviceSecret}|{deviceId}| 一机一密 | $dg/device/%u/%d/# | $dg/thing/%u/%d/# |
-| Device |{productId}|{productSecret}|{deviceId}| 证书加密 | $dg/device/%u/# | $dg/thing/%u/# |
-| User |{userId}|{Token}|{Token}| Token认证 | $dg/user/%t/# | $dg/thing/%t/# |
-
-
+| Device |{productId}|{productSecret}|{clientId}| 一型一密 | $dg/device/%u/# | $dg/thing/%u/# |
+| Device |{productId}|{deviceSecret}|{clientId}| 一机一密 | $dg/device/%u/%d/# | $dg/thing/%u/%c/# |
+| Device |{productId}|{productSecret}|{clientId}| 证书加密 | $dg/device/%u/# | $dg/thing/%u/# |
+| User |{userId}|{Token}|{Token}| Token认证 | $dg/user/%c/# | $dg/thing/%c/# |
 
 ## topic设计
 | 分类   | Topic  |  发布者 |  订阅者  |
@@ -54,4 +52,16 @@
 | 事件上报 |$dg/user/{deviceId}/events|平台|用户|
 
 ## payload设计
+
 + 支持grpc多语言编解码
+
+```
+Dlink RunTime                             Third-party Decode/Encode
++========================+                 +========+==========+
+|    Dlink              |                 |        |          |
+|   +----------------+   |      gRPC       | gRPC   |  User's  |
+|   |   gPRC Client  | ------------------> | Server |  Codes   |
+|   +----------------+   |    (HTTP/2)     |        |          |
+|                        |                 |        |          |
++========================+                 +========+==========+
+```

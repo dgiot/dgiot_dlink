@@ -1,5 +1,5 @@
 %%--------------------------------------------------------------------
-%% Copyright (c) 2020-2021 DGIOT Technologies Co., Ltd. All Rights Reserved.
+%% Copyright (c) 2020 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -14,29 +14,27 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
-%% @doc
-%%
-%% dgiot_mqtt_app:
-%%
-%%
-%%
-%% @end
--module(dgiot_mqtt_app).
--emqx_plugin(?MODULE).
--behaviour(application).
+-module(dgiot_dlink).
 
-%% Application callbacks
--export([start/2, stop/1]).
+-compile(export_all).
+-compile(nowarn_export_all).
 
+start() ->
+    Services = #{protos => [dgiot_dlink_pb],
+        services => #{'Greeter' => dgiot_greeter_svr}
+    },
+    {ok, _} = grpc:start_server(server, 30051, Services, []).
 
-%% ===================================================================
-%% Application callbacks
-%% ===================================================================
+stop() ->
+    _ = grpc:stop_server(server).
 
-start(_StartType, _StartArgs) ->
-    {ok, Sup} = dgiot_mqtt_sup:start_link(),
-    {ok, Sup}.
+login() ->
+    SvrAddr =  "http://127.0.0.1:30051",
+    {ok, _} = grpc_client_sup:create_channel_pool(channel, SvrAddr, #{}).
 
+logout() ->
+    _ = grpc_client_sup:stop_channel_pool(channel).
 
-stop(_State) ->
-    ok.
+send() ->
+    dgiot_greeter_client:say_hello(#{name => <<"Xiao Ming">>}, #{channel => channel}).
+
